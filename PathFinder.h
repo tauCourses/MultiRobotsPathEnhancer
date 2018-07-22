@@ -11,17 +11,22 @@
 #include "ConfigurationPoint.h"
 #include "WorkingSpace.h"
 
-#define RADIUS 1
+#define RADIUS 3
 
 using namespace std;
 
 class Edge{
 public:
-    ConfigurationPoint *from, *to;
+    CPoint from, to;
     double distance;
     int robotMovedIndex = -1;
 
     bool operator<(const Edge &rhs) const;
+};
+
+struct CompareCPoint
+{
+    bool operator()(const CPoint& a, const CPoint& b) const;
 };
 
 class PathFinder
@@ -30,19 +35,20 @@ private:
     int numberOfRobots;
     WorkingSpace& workingSpace;
 
-    ConfigurationPoint *startCPoint, *endCPoint;
-    set<ConfigurationPoint> cMap;
+    CPoint startCPoint, endCPoint;
+    set<CPoint, CompareCPoint> cSet;
     priority_queue<Edge> queue;
 
-    void addEdge(ConfigurationPoint *current, int robotMovedIndex, Point_2 robotMovedNewPosition);
-    void addNeighbors(ConfigurationPoint *current);
+    void addEdge(CPoint current, int robotMovedIndex, Point_2& robotMovedNewPosition);
+    void addNeighbors(CPoint current);
 
-    bool isEdgeLegal(Edge edge);
+    bool isEdgeLegal(Edge& edge);
 
 public:
     PathFinder(WorkingSpace& workingSpace);
     bool findPath(vector<Point_2>& start, vector<Point_2>& end);
     list<ConfigurationPoint> fetchPath();
 };
+
 
 #endif //MRPE_PATHFINDER_H

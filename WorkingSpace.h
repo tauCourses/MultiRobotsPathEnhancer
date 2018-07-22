@@ -5,7 +5,7 @@
 #include <random>
 
 #include "CGAL_defines.h"
-#define NUM_OF_POINTS_PER_SQUARE 10
+#define NUM_OF_POINTS_PER_SQUARE 2
 
 using namespace std;
 
@@ -20,12 +20,15 @@ private:
     Arrangement_2 arr;
     Landmarks_pl pl;
     Tree tree;
+    int numberOfPoints = 0;
 
     void verticalDecomposition(Kernel &ker);
     void addVerticalSegment(Vertex_handle v, CGAL::Object obj, Kernel &ker);
     void createArrangment();
     void setRandomPoints();
     void setFaceRandomPoints(Face_handle face);
+
+    void printArr();
 
 
 public:

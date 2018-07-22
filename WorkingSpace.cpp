@@ -31,6 +31,8 @@ WorkingSpace::WorkingSpace(Polygon_2 &outer_poly, vector<Polygon_2> &obstacles) 
         outer_poly(outer_poly), obstacles(obstacles){
     this->createArrangment();
     this->setRandomPoints();
+
+    //this->printArr();
 }
 
 vector<Point_2> WorkingSpace::getNeighbors(Point_2 p, FT radius) {
@@ -114,6 +116,7 @@ void WorkingSpace::setRandomPoints() {
             continue;
         setFaceRandomPoints(it);
     }
+    cout << "Number of points " << numberOfPoints << endl;
 }
 
 void WorkingSpace::setFaceRandomPoints(Face_handle face) {
@@ -149,19 +152,16 @@ void WorkingSpace::setFaceRandomPoints(Face_handle face) {
     uniform_real_distribution<double> yUnif = uniform_real_distribution<double>(CGAL::to_double(miny), CGAL::to_double(maxy));
     std::default_random_engine re;
 
-    int numberOfPoints = (int)(faceSize*NUM_OF_POINTS_PER_SQUARE);
+    int numberOfPointsInFace = (int)(faceSize*NUM_OF_POINTS_PER_SQUARE);
     vector<Point_2> cpoints;
-    int numOfPoints = 0;
-    for(int i=0; i<numberOfPoints; i++) {
+    for(int i=0; i<numberOfPointsInFace; i++) {
         Point_2 p = {xUnif(re), yUnif(re)};
         if (inLegalFace(p))
         {
             tree.insert(p);
-            numOfPoints++;
+            numberOfPoints++;
         }
     }
-    //cout << "num of points " << numOfPoints << endl;
-
 }
 
 void WorkingSpace::addVerticalSegment(Vertex_handle v, CGAL::Object obj, Kernel &ker) {
@@ -231,5 +231,28 @@ void WorkingSpace::verticalDecomposition(Kernel &ker) {
         // Add a vertical segment to the feature above the vertex.
         addVerticalSegment(arr.non_const_handle(it->first), it->second.second, ker);
         prev = it;
+    }
+}
+
+void WorkingSpace::printArr()
+{
+    cout << "number of faces - " << arr.number_of_faces() << endl;
+    Face_iterator it = arr.faces_begin();
+    for(;it!=arr.faces_end();it++)
+    {
+        if(it != arr.unbounded_face()) {
+            ccb_haledge_circulator first = it->outer_ccb();
+            ccb_haledge_circulator circ = first;
+            do {
+                Halfedge_const_handle temp = circ;
+                cout << temp->source()->point() << " ";
+            } while (++circ != first);
+            cout << endl;
+        } else
+            cout << "unboanded!\n";
+        if(it->contained())
+            cout << "contained!" <<endl;
+        else
+            cout << "not contained!" <<endl;
     }
 }

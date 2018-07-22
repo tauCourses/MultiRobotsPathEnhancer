@@ -47,6 +47,15 @@ vector<Point_2> loadPoints(ifstream &is, int numberOfRobots) {
 
 list<ConfigurationPoint> findPath(vector<Point_2>& start, vector<Point_2>& end,
                                         Polygon_2 &outer_obstacle, vector<Polygon_2> &obstacles) {
+    cout << "start robots ";
+    for(Point_2& p:start)
+        cout << p << " - ";
+    cout << endl;
+    cout << "end robots ";
+    for(Point_2& p:end)
+        cout << p << " - ";
+    cout << endl;
+
     WorkingSpace ws(outer_obstacle, obstacles);
     PathFinder finder(ws);
     if(finder.findPath(start, end))
@@ -55,10 +64,7 @@ list<ConfigurationPoint> findPath(vector<Point_2>& start, vector<Point_2>& end,
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        cerr << "[USAGE]: inputRobots inputObstacles outputFile" << endl;
-        return 1;
-    }
+
 
     ifstream inputRobotsFile(argv[1]), inputObstaclesFile(argv[2]);
     if (!inputRobotsFile.is_open() || !inputObstaclesFile.is_open()) {
@@ -90,13 +96,8 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         outputFile << result.size() << endl;
-        for (ConfigurationPoint &cp : result) {
-            for(Point_2& robot: cp.robots)
-            {
-                outputFile << robot.x().to_double() << " " << robot.y().to_double() << " ";
-            }
-            outputFile << endl;
-        }
+        for (ConfigurationPoint &cp : result)
+            outputFile << cp << endl;
         outputFile.close();
     }
     catch (const char* c)

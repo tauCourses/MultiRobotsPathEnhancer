@@ -1,6 +1,8 @@
 #include "ConfigurationPoint.h"
 
-double ConfigurationPoint::distanceToConfiguration(ConfigurationPoint *dest) {
+long ConfigurationPoint::objectCounter=1;
+
+double ConfigurationPoint::distanceToConfiguration(CPoint dest) {
     double sum = 0;
     for (int i = 0; i < numberOfRobots; i++) {
         double xdiff = CGAL::to_double(this->robots[i].x()) - CGAL::to_double(dest->robots[i].x());
@@ -23,19 +25,22 @@ bool ConfigurationPoint::isConfigurationLegal() {
     return true;
 }
 
-ConfigurationPoint::ConfigurationPoint(vector<Point_2> robots) {
+ConfigurationPoint::ConfigurationPoint(vector<Point_2>& robots) {
     this->robots = robots;
     this->numberOfRobots = static_cast<int>(robots.size());
+    this->index = ConfigurationPoint::objectCounter++;
+   // cout << ConfigurationPoint::objectCounter << endl;
 
 }
 
-ConfigurationPoint::ConfigurationPoint(ConfigurationPoint *old, int robotChangedIndex,
-                                       Point_2 robotChangedNewPosition) {
+ConfigurationPoint::ConfigurationPoint(CPoint old, int robotChangedIndex,
+                                       Point_2& robotChangedNewPosition) {
 
     this->numberOfRobots = old->numberOfRobots;
     this->robots = old->robots;
-    this->robots[robotChangedIndex] = robotChangedNewPosition;
-
+    this->robots[robotChangedIndex] = std::move(robotChangedNewPosition);
+  //  cout << ConfigurationPoint::objectCounter << endl;
+    this->index = ConfigurationPoint::objectCounter++;
 }
 
 bool ConfigurationPoint::operator<(const ConfigurationPoint &rhs) const {
@@ -54,4 +59,14 @@ bool ConfigurationPoint::operator!=(const ConfigurationPoint &rhs) const {
             return true;
     }
     return false;
+}
+
+ostream &operator<<(std::ostream &os, const ConfigurationPoint &cp)
+{
+    os << cp.robots[0].x().to_double() << " " << cp.robots[0].y().to_double();
+    for(int i=1; i < cp.numberOfRobots; i++)
+    {
+        os << " " << cp.robots[i].x().to_double() << " " << cp.robots[i].y().to_double();
+    }
+    return os;
 }

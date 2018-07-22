@@ -13,34 +13,39 @@ bool Edge::operator<(const Edge &rhs) const {
     return this->to > rhs.to;
 }
 
+bool CompareCPoint::operator()(const CPoint &a, const CPoint &b) const {
+    return *a < *b;
+}
 
-void PathFinder::addEdge(ConfigurationPoint *current, int robotMovedIndex, Point_2 robotMovedNewPosition) {
-    auto it = cMap.insert({current, robotMovedIndex, robotMovedNewPosition});
+void PathFinder::addEdge(CPoint current, int robotMovedIndex, Point_2& robotMovedNewPosition) {
+    CPoint temp = make_shared<ConfigurationPoint>(ConfigurationPoint(current, robotMovedIndex, robotMovedNewPosition));
 
-    ConfigurationPoint* temp = const_cast<ConfigurationPoint *>(&(*it.first));
-
-    if(!temp->isConfigurationLegal())
+    auto it=cSet.find(temp);
+    if(it != cSet.end())
     {
-        cMap.erase(it.first);
-        return;
+        temp = *it;
+        if(temp->visited)
+            return;
+    } else
+    {
+        if(!temp->isConfigurationLegal())
+            return;
+        cSet.insert(temp);
     }
 
-    if(!it.second && temp->visited)
-        return;
-
-
     if(temp->heuristic < 0)
-        temp->heuristic = temp->distanceToConfiguration(endCPoint);
+        temp->heuristic = temp->distanceToConfiguration(this->endCPoint);
     double newDistance = current->distance + temp->distanceToConfiguration(current) + temp->heuristic;
 
     this->queue.push({current, temp, newDistance, robotMovedIndex});
 }
 
-void PathFinder::addNeighbors(ConfigurationPoint *current) {
+void PathFinder::addNeighbors(CPoint current) {
+    int numOfEdges = 0;
     for(int i=0; i<numberOfRobots; i++)
     {
         vector<Point_2> neighbors = workingSpace.getNeighbors(current->robots[i], RADIUS);
-        int numOfEdges = 0;
+
         for(Point_2& neighbor:neighbors) {
             if (neighbor != current->robots[i])
             {
@@ -60,25 +65,28 @@ bool PathFinder::findPath(vector<Point_2>& start, vector<Point_2>& end)
     workingSpace.insertPoints(start);
     workingSpace.insertPoints(end);
 
-    auto itStart = cMap.insert(start);
-    startCPoint = const_cast<ConfigurationPoint *>(&(*itStart.first));
+    this->startCPoint = make_shared<ConfigurationPoint>(start);
+    cSet.insert(this->startCPoint);
     startCPoint->visited = true;
 
-    auto itEnd = cMap.insert(end);
-    endCPoint = const_cast<ConfigurationPoint *>(&(*itEnd.first));
+    this->endCPoint = make_shared<ConfigurationPoint>(end);
+    cSet.insert(this->endCPoint);
 
     addNeighbors(startCPoint);
 
     while (!queue.empty()) {
+        //cout << "queue size - " << queue.size() << endl;
         Edge currentEdge = queue.top();
         queue.pop();
-        if(!isEdgeLegal(currentEdge))
+
+        if (!isEdgeLegal(currentEdge))
             continue;
 
-        ConfigurationPoint* currentCpoint = currentEdge.to;
+        CPoint currentCpoint = currentEdge.to;
+        //cout << *currentCpoint << endl;
 
         currentCpoint->last = currentEdge.from;
-        currentCpoint->distance = currentEdge.distance - currentEdge.to->heuristic;
+        currentCpoint->distance = currentEdge.distance - currentCpoint->heuristic;
         currentCpoint->visited = true;
 
         if(currentCpoint == endCPoint)
@@ -90,12 +98,12 @@ bool PathFinder::findPath(vector<Point_2>& start, vector<Point_2>& end)
     return false;
 }
 
-bool PathFinder::isEdgeLegal(Edge edge) {
+bool PathFinder::isEdgeLegal(Edge& edge) {
     if(edge.to->visited)
         return false;
 
-    Point_2 startPoint = edge.from->robots[edge.robotMovedIndex];
-    Point_2 endPoint = edge.to->robots[edge.robotMovedIndex];
+    Point_2& startPoint = edge.from->robots[edge.robotMovedIndex];
+    Point_2& endPoint = edge.to->robots[edge.robotMovedIndex];
     Segment_2 qry(startPoint, endPoint);
 
     if(!this->workingSpace.segmentQuery(qry))
@@ -106,7 +114,7 @@ bool PathFinder::isEdgeLegal(Edge edge) {
     {
         if(edge.robotMovedIndex == i)
             continue;
-        Point_2 stadyPoint = edge.to->robots[i];
+        Point_2& stadyPoint = edge.to->robots[i];
 
         Point_2 p1(stadyPoint.x()-1, stadyPoint.y()-1);
         Point_2 p2(stadyPoint.x()-1, stadyPoint.y()+1);
@@ -124,15 +132,13 @@ bool PathFinder::isEdgeLegal(Edge edge) {
 
 list<ConfigurationPoint> PathFinder::fetchPath() {
     list<ConfigurationPoint> configurationsList;
-    ConfigurationPoint *temp = this->endCPoint;
-    ConfigurationPoint *start = this->startCPoint;
-    while (temp != start) {
+    CPoint temp = this->endCPoint;
+    cout << "fetch\n";
+    while (temp != this->startCPoint) {
         configurationsList.emplace_front(*temp);
         temp = temp->last;
     }
+    configurationsList.emplace_front(*temp);
 
     return configurationsList;
-
 }
-
-
