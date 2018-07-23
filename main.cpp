@@ -6,6 +6,7 @@
 
 #include "CGAL_defines.h"
 #include "PathFinder.h"
+#include "CMDManager.h"
 using namespace std;
 
 
@@ -45,31 +46,13 @@ vector<Point_2> loadPoints(ifstream &is, int numberOfRobots) {
     return points;
 }
 
-list<ConfigurationPoint> findPath(vector<Point_2>& start, vector<Point_2>& end,
-                                        Polygon_2 &outer_obstacle, vector<Polygon_2> &obstacles) {
-    cout << "start robots ";
-    for(Point_2& p:start)
-        cout << p << " - ";
-    cout << endl;
-    cout << "end robots ";
-    for(Point_2& p:end)
-        cout << p << " - ";
-    cout << endl;
-
-    WorkingSpace ws(outer_obstacle, obstacles);
-    PathFinder finder(ws);
-    if(finder.findPath(start, end))
-        return finder.fetchPath();
-    throw "no path found";
-}
-
 int main(int argc, char *argv[]) {
+    CMDManager cmdManager(argc, argv);
 
-
-    ifstream inputRobotsFile(argv[1]), inputObstaclesFile(argv[2]);
+    ifstream inputRobotsFile(cmdManager.robotFile), inputObstaclesFile(cmdManager.obstecalesFile);
     if (!inputRobotsFile.is_open() || !inputObstaclesFile.is_open()) {
-        if (!inputRobotsFile.is_open()) cerr << "ERROR: Couldn't open file: " << argv[1] << endl;
-        if (!inputObstaclesFile.is_open()) cerr << "ERROR: Couldn't open file: " << argv[2] << endl;
+        if (!inputRobotsFile.is_open()) cerr << "ERROR: Couldn't open file: " << cmdManager.robotFile << endl;
+        if (!inputObstaclesFile.is_open()) cerr << "ERROR: Couldn't open file: " << cmdManager.obstecalesFile << endl;
         return -1;
     }
     int numberOfRobots;
@@ -78,27 +61,32 @@ int main(int argc, char *argv[]) {
     vector<Point_2> end = loadPoints(inputRobotsFile, numberOfRobots);
     inputRobotsFile.close();
 
-    auto outer_obstacle = loadPolygon(inputObstaclesFile);
-    auto obstacles = loadPolygons(inputObstaclesFile);
+    Polygon_2 outer_obstacle = loadPolygon(inputObstaclesFile);
+    vector<Polygon_2> obstacles = loadPolygons(inputObstaclesFile);
     inputObstaclesFile.close();
+
     try {
-
-
         boost::timer timer;
-        auto result = findPath(start, end, outer_obstacle, obstacles);
-        auto secs = timer.elapsed();
+        WorkingSpace ws(outer_obstacle, obstacles, cmdManager.exportPoints, cmdManager.pointsPerSquare);
+
+        PathFinder finder(ws, cmdManager.searchRadius);
+        Path path = finder.findPath(start, end);
+        if(!path.legal)
+        {
+            finder.printStatistics(true);
+            throw "no path found";
+        }
+
+        double secs = timer.elapsed();
         cout << "Path created:      " << secs << " secs" << endl;
 
-        ofstream outputFile;
-        outputFile.open(argv[3]);
-        if (!outputFile.is_open()) {
-            cerr << "ERROR: Couldn't open file: " << argv[3] << endl;
-            return -1;
-        }
-        outputFile << result.size() << endl;
-        for (ConfigurationPoint &cp : result)
-            outputFile << cp << endl;
-        outputFile.close();
+        ws.printStatistics(cmdManager.printStatistics);
+        finder.printStatistics(cmdManager.printStatistics);
+        path.printStatistics(cmdManager.printStatistics);
+        ws.exportPoints();
+
+        path.exportPath(cmdManager.outputFile);
+
     }
     catch (const char* c)
     {

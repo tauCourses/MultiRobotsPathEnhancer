@@ -1,7 +1,7 @@
 #include "PathFinder.h"
 
-PathFinder::PathFinder(WorkingSpace& workingSpace)
-        : workingSpace(workingSpace) {}
+PathFinder::PathFinder(WorkingSpace& workingSpace, double searchRadius)
+        : workingSpace(workingSpace), searchRadius(searchRadius) {}
 
 bool Edge::operator<(const Edge &rhs) const {
     if(this->distance != rhs.distance)
@@ -19,7 +19,6 @@ bool CompareCPoint::operator()(const CPoint &a, const CPoint &b) const {
 
 void PathFinder::addEdge(CPoint current, int robotMovedIndex, Point_2& robotMovedNewPosition) {
     CPoint temp = make_shared<ConfigurationPoint>(ConfigurationPoint(current, robotMovedIndex, robotMovedNewPosition));
-
     auto it=cSet.find(temp);
     if(it != cSet.end())
     {
@@ -31,8 +30,10 @@ void PathFinder::addEdge(CPoint current, int robotMovedIndex, Point_2& robotMove
         if(!temp->isConfigurationLegal())
             return;
         cSet.insert(temp);
+        this->numberOfCpoints++;
     }
-
+    this->numberOfEdges++;
+    workingSpace.updatePointMap(temp->robots[robotMovedIndex], POINT_IN_CONFIGURATION);
     if(temp->heuristic < 0)
         temp->heuristic = temp->distanceToConfiguration(this->endCPoint);
     double newDistance = current->distance + temp->distanceToConfiguration(current) + temp->heuristic;
@@ -41,29 +42,24 @@ void PathFinder::addEdge(CPoint current, int robotMovedIndex, Point_2& robotMove
 }
 
 void PathFinder::addNeighbors(CPoint current) {
-    int numOfEdges = 0;
     for(int i=0; i<numberOfRobots; i++)
     {
-        vector<Point_2> neighbors = workingSpace.getNeighbors(current->robots[i], RADIUS);
-
+        vector<Point_2> neighbors = workingSpace.getNeighbors(current->robots[i], searchRadius);
         for(Point_2& neighbor:neighbors) {
             if (neighbor != current->robots[i])
-            {
                 addEdge(current, i, neighbor);
-                numOfEdges++;
-            }
         }
     }
 }
 
-bool PathFinder::findPath(vector<Point_2>& start, vector<Point_2>& end)
+Path PathFinder::findPath(vector<Point_2>& start, vector<Point_2>& end)
 {
     if(start.size() != end.size())
         throw "inconsistent number of robots";
     this->numberOfRobots = static_cast<int>(start.size());
 
-    workingSpace.insertPoints(start);
-    workingSpace.insertPoints(end);
+    workingSpace.insertPoints(start, START_POINT);
+    workingSpace.insertPoints(end, END_POINT);
 
     this->startCPoint = make_shared<ConfigurationPoint>(start);
     cSet.insert(this->startCPoint);
@@ -75,27 +71,30 @@ bool PathFinder::findPath(vector<Point_2>& start, vector<Point_2>& end)
     addNeighbors(startCPoint);
 
     while (!queue.empty()) {
-        //cout << "queue size - " << queue.size() << endl;
+        if(queue.size() > maxQueueSize)
+            maxQueueSize = queue.size();
         Edge currentEdge = queue.top();
         queue.pop();
 
-        if (!isEdgeLegal(currentEdge))
+        if (!isEdgeLegal(currentEdge)) {
+            this->deprecatedEdges++;
             continue;
-
+        }
+        this->processedEdges++;
         CPoint currentCpoint = currentEdge.to;
-        //cout << *currentCpoint << endl;
-
+        if(currentCpoint->robotChangedIndex >=0)
+            workingSpace.updatePointMap(currentCpoint->robots[currentCpoint->robotChangedIndex], POINT_PROCESSED);
         currentCpoint->last = currentEdge.from;
         currentCpoint->distance = currentEdge.distance - currentCpoint->heuristic;
         currentCpoint->visited = true;
 
         if(currentCpoint == endCPoint)
-            return true;
+            return Path(this->startCPoint, this->endCPoint, workingSpace);
 
         addNeighbors(currentCpoint);
 
     }
-    return false;
+    return Path();
 }
 
 bool PathFinder::isEdgeLegal(Edge& edge) {
@@ -130,15 +129,14 @@ bool PathFinder::isEdgeLegal(Edge& edge) {
     return true;
 }
 
-list<ConfigurationPoint> PathFinder::fetchPath() {
-    list<ConfigurationPoint> configurationsList;
-    CPoint temp = this->endCPoint;
-    cout << "fetch\n";
-    while (temp != this->startCPoint) {
-        configurationsList.emplace_front(*temp);
-        temp = temp->last;
-    }
-    configurationsList.emplace_front(*temp);
+void PathFinder::printStatistics(bool print) {
+    if(!print)
+        return;
 
-    return configurationsList;
+    cout << "PATH FINDER STATISTICS:\n";
+    cout << "max queue size  " << maxQueueSize << endl;
+    cout << "number of edges " << numberOfEdges << endl;
+    cout << "number of configuration points " << numberOfCpoints << endl;
+    cout << "number of edges processed " << processedEdges << endl;
+    cout << "number of deprecated edges  " << deprecatedEdges << endl;
 }

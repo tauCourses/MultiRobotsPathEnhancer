@@ -27,26 +27,30 @@ void WorkingSpace::createArrangment() {
     pl.attach(arr);
 }
 
-WorkingSpace::WorkingSpace(Polygon_2 &outer_poly, vector<Polygon_2> &obstacles) :
-        outer_poly(outer_poly), obstacles(obstacles){
+WorkingSpace::WorkingSpace(Polygon_2 &outer_poly, vector<Polygon_2> &obstacles,
+                           bool exportPointsEnabled, double pointsPerSquare) :
+        outer_poly(outer_poly), obstacles(obstacles),
+        exportPointsEnabled(exportPointsEnabled), pointsPerSquare(pointsPerSquare){
     this->createArrangment();
     this->setRandomPoints();
 
     //this->printArr();
 }
 
-vector<Point_2> WorkingSpace::getNeighbors(Point_2 p, FT radius) {
+vector<Point_2> WorkingSpace::getNeighbors(Point_2& p, double radius) {
     vector<Point_2> L1;
     Fuzzy_sphere rc1(p, radius);
     tree.search(std::back_inserter(L1), rc1);
     return L1;
 }
 
-void WorkingSpace::insertPoints(vector<Point_2> points) {
-    for(Point_2& s: points) {
-        if (!this->inLegalFace(s))
+void WorkingSpace::insertPoints(vector<Point_2> points, POINT_STATES state) {
+    for(Point_2& p: points) {
+        if (!this->inLegalFace(p))
             throw "robot first position is not legal";
-        tree.insert(s);
+        tree.insert(p);
+        if(exportPointsEnabled)
+            pointsStateMap.insert(pair<Point_2,POINT_STATES>(p, state));
     }
 }
 
@@ -112,11 +116,12 @@ void WorkingSpace::setRandomPoints() {
     Face_iterator it = arr.faces_begin();
     for(;it!=arr.faces_end();it++)
     {
+        numberOfFaces++;
         if(!it->contained())
             continue;
+        numberOfConatinedFaces++;
         setFaceRandomPoints(it);
     }
-    cout << "Number of points " << numberOfPoints << endl;
 }
 
 void WorkingSpace::setFaceRandomPoints(Face_handle face) {
@@ -147,19 +152,23 @@ void WorkingSpace::setFaceRandomPoints(Face_handle face) {
 
 
     double faceSize = CGAL::to_double((maxx-minx) * (maxy - miny));
-
+    std::random_device rd;
+    mt19937 gen(rd());
     uniform_real_distribution<double> xUnif = uniform_real_distribution<double>(CGAL::to_double(minx), CGAL::to_double(maxx));
     uniform_real_distribution<double> yUnif = uniform_real_distribution<double>(CGAL::to_double(miny), CGAL::to_double(maxy));
-    std::default_random_engine re;
+   // std::default_random_engine re;
 
-    int numberOfPointsInFace = (int)(faceSize*NUM_OF_POINTS_PER_SQUARE);
+    int numberOfPointsInFace = (int)(faceSize*this->pointsPerSquare);
+    numberOfPointsChecked += numberOfPointsInFace;
     vector<Point_2> cpoints;
     for(int i=0; i<numberOfPointsInFace; i++) {
-        Point_2 p = {xUnif(re), yUnif(re)};
+        Point_2 p = {xUnif(gen), yUnif(gen)};
         if (inLegalFace(p))
         {
             tree.insert(p);
-            numberOfPoints++;
+            numberOfLegalPoints++;
+            if(this->exportPointsEnabled)
+                pointsStateMap.insert(pair<Point_2,POINT_STATES>(p, POINT_CREATED));
         }
     }
 }
@@ -255,4 +264,41 @@ void WorkingSpace::printArr()
         else
             cout << "not contained!" <<endl;
     }
+}
+
+void WorkingSpace::updatePointMap(Point_2& p, POINT_STATES state) {
+    if(!this->exportPointsEnabled)
+        return;
+    auto it = pointsStateMap.find(p);
+    if (it != pointsStateMap.end()) {
+        if(it->second<state)
+            it->second = state;
+    }
+}
+
+void WorkingSpace::exportPoints() {
+    if(!this->exportPointsEnabled)
+        return;
+    ofstream outputFile;
+    outputFile.open("points");
+
+    if(!this->exportPointsEnabled)
+        return;
+
+    for (auto it=pointsStateMap.begin(); it!=pointsStateMap.end(); ++it)
+        outputFile << it->second << " " << it->first.x().to_double() << " " << it->first.y().to_double() << endl;
+
+    outputFile.close();
+
+}
+
+void WorkingSpace::printStatistics(bool print) {
+    if(!print)
+        return;
+
+    cout << "WORKING SPACE STATISTICS:\n";
+    cout << "number of faces " << numberOfFaces << endl;
+    cout << "number of contained faces " << numberOfConatinedFaces << endl;
+    cout << "number of points checked " << numberOfPointsChecked << endl;
+    cout << "number of legal points  " << numberOfLegalPoints << endl;
 }

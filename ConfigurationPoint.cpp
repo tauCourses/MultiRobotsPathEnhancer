@@ -7,7 +7,7 @@ double ConfigurationPoint::distanceToConfiguration(CPoint dest) {
     for (int i = 0; i < numberOfRobots; i++) {
         double xdiff = CGAL::to_double(this->robots[i].x()) - CGAL::to_double(dest->robots[i].x());
         double ydiff = CGAL::to_double(this->robots[i].y()) - CGAL::to_double(dest->robots[i].y());
-        sum += xdiff * xdiff + ydiff * ydiff;
+        sum += sqrt(xdiff * xdiff + ydiff * ydiff);
     }
 
     return sum;
@@ -28,9 +28,6 @@ bool ConfigurationPoint::isConfigurationLegal() {
 ConfigurationPoint::ConfigurationPoint(vector<Point_2>& robots) {
     this->robots = robots;
     this->numberOfRobots = static_cast<int>(robots.size());
-    this->index = ConfigurationPoint::objectCounter++;
-   // cout << ConfigurationPoint::objectCounter << endl;
-
 }
 
 ConfigurationPoint::ConfigurationPoint(CPoint old, int robotChangedIndex,
@@ -39,8 +36,8 @@ ConfigurationPoint::ConfigurationPoint(CPoint old, int robotChangedIndex,
     this->numberOfRobots = old->numberOfRobots;
     this->robots = old->robots;
     this->robots[robotChangedIndex] = std::move(robotChangedNewPosition);
-  //  cout << ConfigurationPoint::objectCounter << endl;
-    this->index = ConfigurationPoint::objectCounter++;
+    this->robotChangedIndex = robotChangedIndex;
+
 }
 
 bool ConfigurationPoint::operator<(const ConfigurationPoint &rhs) const {

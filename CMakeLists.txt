@@ -37,7 +37,7 @@ endif ()
 # Creating entries for target: executable
 # ############################
 
-set(SOURCE_FILES CGAL_defines.h main.cpp PathFinder.cpp PathFinder.h ConfigurationPoint.h ConfigurationPoint.cpp WorkingSpace.cpp WorkingSpace.h cmdManager.cpp cmdManager.h)
+set(SOURCE_FILES CGAL_defines.h main.cpp PathFinder.cpp PathFinder.h ConfigurationPoint.h ConfigurationPoint.cpp WorkingSpace.cpp WorkingSpace.h CMDManager.cpp CMDManager.h Path.cpp Path.h)
 
 add_executable(MRPE ${SOURCE_FILES})
 add_to_cached_list(CGAL_EXECUTABLE_TARGETS MRPE)

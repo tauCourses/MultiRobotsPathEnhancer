@@ -10,6 +10,7 @@
 #include "CGAL_defines.h"
 #include "ConfigurationPoint.h"
 #include "WorkingSpace.h"
+#include "Path.h"
 
 #define RADIUS 3
 
@@ -33,6 +34,8 @@ class PathFinder
 {
 private:
     int numberOfRobots;
+    long numberOfEdges=0, numberOfCpoints=0, processedEdges=0, deprecatedEdges=0, maxQueueSize=0;
+    double searchRadius;
     WorkingSpace& workingSpace;
 
     CPoint startCPoint, endCPoint;
@@ -45,9 +48,9 @@ private:
     bool isEdgeLegal(Edge& edge);
 
 public:
-    PathFinder(WorkingSpace& workingSpace);
-    bool findPath(vector<Point_2>& start, vector<Point_2>& end);
-    list<ConfigurationPoint> fetchPath();
+    PathFinder(WorkingSpace& workingSpace, double searchRadius);
+    Path findPath(vector<Point_2>& start, vector<Point_2>& end);
+    void printStatistics(bool print);
 };
 
 

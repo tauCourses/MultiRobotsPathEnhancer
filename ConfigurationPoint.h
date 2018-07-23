@@ -26,9 +26,9 @@ public:
     vector<Point_2> robots;
     CPoint last;
     bool visited = false;
-    long index;
     double heuristic=-1;
     double distance = 0;
+    int robotChangedIndex=-1;
 };
 
 ostream &operator<<(std::ostream &os, const ConfigurationPoint &cp);
