@@ -2,3 +2,9 @@
 cmake-build-debug/
 *.zip
 output
+CMakeCache.txt
+CMakeFiles/
+MRPE
+*.cbp
+MakeFile
+*.cmake

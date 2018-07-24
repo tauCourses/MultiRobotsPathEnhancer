@@ -1,7 +1,7 @@
 #include "PathFinder.h"
 
-PathFinder::PathFinder(WorkingSpace& workingSpace, double searchRadius)
-        : workingSpace(workingSpace), searchRadius(searchRadius) {}
+PathFinder::PathFinder(WorkingSpace& workingSpace, double searchRadius, double heuristicRatio)
+        : workingSpace(workingSpace), searchRadius(searchRadius), heuristicRatio(heuristicRatio) {}
 
 bool Edge::operator<(const Edge &rhs) const {
     if(this->distance != rhs.distance)
@@ -35,7 +35,7 @@ void PathFinder::addEdge(CPoint current, int robotMovedIndex, Point_2& robotMove
     this->numberOfEdges++;
     workingSpace.updatePointMap(temp->robots[robotMovedIndex], POINT_IN_CONFIGURATION);
     if(temp->heuristic < 0)
-        temp->heuristic = temp->distanceToConfiguration(this->endCPoint);
+        temp->heuristic = temp->distanceToConfiguration(this->endCPoint) * heuristicRatio;
     double newDistance = current->distance + temp->distanceToConfiguration(current) + temp->heuristic;
 
     this->queue.push({current, temp, newDistance, robotMovedIndex});

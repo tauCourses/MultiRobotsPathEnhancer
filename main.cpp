@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         boost::timer timer;
         WorkingSpace ws(outer_obstacle, obstacles, cmdManager.exportPoints, cmdManager.pointsPerSquare);
 
-        PathFinder finder(ws, cmdManager.searchRadius);
+        PathFinder finder(ws, cmdManager.searchRadius, cmdManager.heuristicRatio);
         Path path = finder.findPath(start, end);
         if(!path.legal)
         {
