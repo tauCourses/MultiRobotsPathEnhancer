@@ -37,20 +37,33 @@ WorkingSpace::WorkingSpace(Polygon_2 &outer_poly, vector<Polygon_2> &obstacles,
     //this->printArr();
 }
 
-vector<Point_2> WorkingSpace::getNeighbors(Point_2& p, double radius) {
+vector<Point_2> WorkingSpace::getNeighbors(Point_2& p, double radius, int robotEnforcement) {
+
     vector<Point_2> L1;
     Fuzzy_sphere rc1(p, radius);
     tree.search(std::back_inserter(L1), rc1);
+    if(robotEnforcement != -1)
+    {
+        L1.erase(std::remove_if(
+                L1.begin(), L1.end(),
+                [&](const Point_2& x) {
+                    return pointsRobotEnforcement[x] != robotEnforcement;
+                }), L1.end());
+    }
     return L1;
 }
 
-void WorkingSpace::insertPoints(vector<Point_2> points, POINT_STATES state) {
-    for(Point_2& p: points) {
-        if (!this->inLegalFace(p))
-            throw "robot first position is not legal";
-        tree.insert(p);
+void WorkingSpace::insertPoints(vector<Point_2> points, POINT_STATES state, bool robotEnforcement) {
+    for(int i=0; i<points.size(); i++) {
+        if (!this->inLegalFace(points[i]))
+            throw "illegal position for a robot";
+        tree.insert(points[i]);
+        numberOfLegalPoints++;
+        if (robotEnforcement)
+            pointsRobotEnforcement.insert(pair<Point_2,int>(points[i], i));
+
         if(exportPointsEnabled)
-            pointsStateMap.insert(pair<Point_2,POINT_STATES>(p, state));
+            pointsStateMap.insert(pair<Point_2,POINT_STATES>(points[i], state));
     }
 }
 
@@ -276,11 +289,17 @@ void WorkingSpace::updatePointMap(Point_2& p, POINT_STATES state) {
     }
 }
 
-void WorkingSpace::exportPoints() {
+void WorkingSpace::exportPoints(string fileName, Path& path) {
     if(!this->exportPointsEnabled)
         return;
+
+    if(path.legal)
+        for (CPoint& cp : path.cPoints)
+            if(cp->robotChangedIndex!=-1)
+                updatePointMap(cp->robots[cp->robotChangedIndex], POINT_IN_PATH);
+
     ofstream outputFile;
-    outputFile.open("points");
+    outputFile.open(fileName);
 
     if(!this->exportPointsEnabled)
         return;
@@ -301,4 +320,67 @@ void WorkingSpace::printStatistics(bool print) {
     cout << "number of contained faces " << numberOfConatinedFaces << endl;
     cout << "number of points checked " << numberOfPointsChecked << endl;
     cout << "number of legal points  " << numberOfLegalPoints << endl;
+}
+
+void WorkingSpace::updatePointsByPath(Path &path, double pointsPerSquare, double rectWidth) {
+    this->pointsPerSquare = pointsPerSquare;
+    this->rectWidth = rectWidth;
+    tree.clear();
+    pointsStateMap.clear();
+    numberOfPointsChecked = 0;
+    numberOfLegalPoints = 0;
+
+    CPoint temp = path.end;
+
+    while (temp != path.start) {
+        if(temp->robotChangedIndex!=-1) {
+            tree.insert(temp->robots[temp->robotChangedIndex]);
+            pointsRobotEnforcement.insert(pair<Point_2,int>(temp->robots[temp->robotChangedIndex], temp->robotChangedIndex));
+            numberOfLegalPoints++;
+            setSegmentRandomPoints({temp->robots[temp->robotChangedIndex],
+                                    temp->last->robots[temp->robotChangedIndex]},
+                                    temp->robotChangedIndex);
+            if(this->exportPointsEnabled)
+                pointsStateMap.insert(pair<Point_2,POINT_STATES>(temp->robots[temp->robotChangedIndex], POINT_CREATED));
+        }
+        temp = temp->last;
+
+    }
+    if(this->exportPointsEnabled)
+    {
+        for(Point_2& p:path.end->robots)
+            updatePointMap(p, END_POINT);
+        for(Point_2& p:temp->robots)
+            pointsStateMap.insert(pair<Point_2,POINT_STATES>(p, START_POINT));
+    }
+}
+
+void WorkingSpace::setSegmentRandomPoints(Segment_2 seg, int robot) {
+    Vector_2 primary(seg);
+    Vector_2 secondary = primary.perpendicular(CGAL::CLOCKWISE);
+
+    secondary = secondary / sqrt(CGAL::to_double(secondary.squared_length()));
+
+    double faceSize = sqrt(CGAL::to_double(primary.squared_length())) * rectWidth;
+
+    std::random_device rd;
+    mt19937 gen(rd());
+    auto xUnif = uniform_real_distribution<double>(0, 1);
+    auto yUnif = uniform_real_distribution<double>(-rectWidth/2, rectWidth/2);
+
+    int numberOfPointsInFace = (int)(faceSize*this->pointsPerSquare);
+    numberOfPointsChecked += numberOfPointsInFace;
+    vector<Point_2> cpoints;
+    for(int i=0; i<numberOfPointsInFace; i++) {
+        Point_2 p = seg.source() +  primary * xUnif(gen) + secondary * yUnif(gen);
+        if (inLegalFace(p))
+        {
+            tree.insert(p);
+            pointsRobotEnforcement.insert(pair<Point_2,int>(p, robot));
+            numberOfLegalPoints++;
+            if(this->exportPointsEnabled)
+                pointsStateMap.insert(pair<Point_2,POINT_STATES>(p, POINT_CREATED));
+        }
+    }
+
 }

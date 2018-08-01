@@ -34,8 +34,8 @@ class PathFinder
 {
 private:
     int numberOfRobots;
-    long numberOfEdges=0, numberOfCpoints=0, processedEdges=0, deprecatedEdges=0, maxQueueSize=0;
-    double searchRadius, heuristicRatio;
+    long numberOfEdges=0, numberOfCpoints=0, processedEdges=0, deprecatedEdges=0, maxQueueSize=0, cuts=0;
+    double searchRadius, heuristicMultiplier;
     WorkingSpace& workingSpace;
 
     CPoint startCPoint, endCPoint;
@@ -43,14 +43,16 @@ private:
     priority_queue<Edge> queue;
 
     void addEdge(CPoint current, int robotMovedIndex, Point_2& robotMovedNewPosition);
-    void addNeighbors(CPoint current);
+    void addNeighbors(CPoint current, bool robotPointsEnforcement);
+    void cutPath();
 
     bool isEdgeLegal(Edge& edge);
 
 public:
-    PathFinder(WorkingSpace& workingSpace, double searchRadius, double heuristicRatio);
-    Path findPath(vector<Point_2>& start, vector<Point_2>& end);
+    PathFinder(WorkingSpace& workingSpace, vector<Point_2>& start, vector<Point_2>& end, bool insertPoints=true);
+    Path findPath(double searchRadius, double heuristicMultiplier, bool cutPath, bool robotPointsEnforcement=false);
     void printStatistics(bool print);
+
 };
 
 

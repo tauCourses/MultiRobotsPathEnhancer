@@ -2,11 +2,10 @@
 #define MRPE_PATH_H
 
 #include "ConfigurationPoint.h"
-#include "WorkingSpace.h"
 
 class Path {
 public:
-    Path(CPoint start, CPoint end, WorkingSpace& ws);
+    Path(CPoint start, CPoint end);
     Path();
 
     CPoint start, end;
@@ -16,7 +15,7 @@ public:
     bool legal=true;
 
     void printStatistics(bool print);
-    void exportPath(char* file);
+    void exportPath(string file);
 };
 
 #endif //MRPE_PATH_H

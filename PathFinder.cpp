@@ -1,7 +1,22 @@
 #include "PathFinder.h"
 
-PathFinder::PathFinder(WorkingSpace& workingSpace, double searchRadius, double heuristicRatio)
-        : workingSpace(workingSpace), searchRadius(searchRadius), heuristicRatio(heuristicRatio) {}
+PathFinder::PathFinder(WorkingSpace& workingSpace, vector<Point_2>& start, vector<Point_2>& end, bool insertPoints)
+        : workingSpace(workingSpace) {
+    if(start.size() != end.size())
+        throw "inconsistent number of robots";
+    this->numberOfRobots = static_cast<int>(start.size());
+
+    if(insertPoints) {
+        workingSpace.insertPoints(start, START_POINT);
+        workingSpace.insertPoints(end, END_POINT);
+    }
+    this->startCPoint = make_shared<ConfigurationPoint>(start);
+    cSet.insert(this->startCPoint);
+    startCPoint->visited = true;
+
+    this->endCPoint = make_shared<ConfigurationPoint>(end);
+    cSet.insert(this->endCPoint);
+}
 
 bool Edge::operator<(const Edge &rhs) const {
     if(this->distance != rhs.distance)
@@ -29,78 +44,79 @@ void PathFinder::addEdge(CPoint current, int robotMovedIndex, Point_2& robotMove
     {
         if(!temp->isConfigurationLegal())
             return;
+
         cSet.insert(temp);
         this->numberOfCpoints++;
     }
     this->numberOfEdges++;
     workingSpace.updatePointMap(temp->robots[robotMovedIndex], POINT_IN_CONFIGURATION);
     if(temp->heuristic < 0)
-        temp->heuristic = temp->distanceToConfiguration(this->endCPoint) * heuristicRatio;
+        temp->heuristic = temp->distanceToConfiguration(this->endCPoint) * heuristicMultiplier;
     double newDistance = current->distance + temp->distanceToConfiguration(current) + temp->heuristic;
 
     this->queue.push({current, temp, newDistance, robotMovedIndex});
 }
 
-void PathFinder::addNeighbors(CPoint current) {
-    for(int i=0; i<numberOfRobots; i++)
+void PathFinder::addNeighbors(CPoint current, bool robotPointsEnforcement) {
+    if(robotPointsEnforcement)
     {
-        vector<Point_2> neighbors = workingSpace.getNeighbors(current->robots[i], searchRadius);
-        for(Point_2& neighbor:neighbors) {
-            if (neighbor != current->robots[i])
-                addEdge(current, i, neighbor);
+        for (int i = 0; i < numberOfRobots; i++) {
+            vector<Point_2> neighbors = workingSpace.getNeighbors(current->robots[i], searchRadius, i);
+            for (Point_2 &neighbor:neighbors) {
+                if (neighbor != current->robots[i])
+                    addEdge(current, i, neighbor);
+            }
+        }
+    } else {
+        for (int i = 0; i < numberOfRobots; i++) {
+            vector<Point_2> neighbors = workingSpace.getNeighbors(current->robots[i], searchRadius);
+            for (Point_2 &neighbor:neighbors) {
+                if (neighbor != current->robots[i])
+                    addEdge(current, i, neighbor);
+            }
         }
     }
 }
 
-Path PathFinder::findPath(vector<Point_2>& start, vector<Point_2>& end)
+Path PathFinder::findPath(double searchRadius, double heuristicMultiplier, bool cutPath, bool robotPointsEnforcement)
 {
-    if(start.size() != end.size())
-        throw "inconsistent number of robots";
-    this->numberOfRobots = static_cast<int>(start.size());
-
-    workingSpace.insertPoints(start, START_POINT);
-    workingSpace.insertPoints(end, END_POINT);
-
-    this->startCPoint = make_shared<ConfigurationPoint>(start);
-    cSet.insert(this->startCPoint);
-    startCPoint->visited = true;
-
-    this->endCPoint = make_shared<ConfigurationPoint>(end);
-    cSet.insert(this->endCPoint);
-
-    addNeighbors(startCPoint);
-
+    this->searchRadius = searchRadius;
+    this->heuristicMultiplier = heuristicMultiplier;
+    addNeighbors(startCPoint, robotPointsEnforcement);
     while (!queue.empty()) {
         if(queue.size() > maxQueueSize)
             maxQueueSize = queue.size();
         Edge currentEdge = queue.top();
         queue.pop();
 
-        if (!isEdgeLegal(currentEdge)) {
+        if (currentEdge.to->visited || !isEdgeLegal(currentEdge)) {
             this->deprecatedEdges++;
             continue;
         }
         this->processedEdges++;
+
         CPoint currentCpoint = currentEdge.to;
-        if(currentCpoint->robotChangedIndex >=0)
-            workingSpace.updatePointMap(currentCpoint->robots[currentCpoint->robotChangedIndex], POINT_PROCESSED);
+
+
         currentCpoint->last = currentEdge.from;
+        currentCpoint->robotChangedIndex = currentEdge.robotMovedIndex;
         currentCpoint->distance = currentEdge.distance - currentCpoint->heuristic;
         currentCpoint->visited = true;
 
-        if(currentCpoint == endCPoint)
-            return Path(this->startCPoint, this->endCPoint, workingSpace);
+        workingSpace.updatePointMap(currentCpoint->robots[currentCpoint->robotChangedIndex], POINT_PROCESSED);
 
-        addNeighbors(currentCpoint);
+        if(currentCpoint == endCPoint) {
+            if(cutPath)
+                this->cutPath();
+            return Path(this->startCPoint, this->endCPoint);
+        }
+        addNeighbors(currentCpoint, robotPointsEnforcement);
 
     }
     return Path();
 }
 
 bool PathFinder::isEdgeLegal(Edge& edge) {
-    if(edge.to->visited)
-        return false;
-
     Point_2& startPoint = edge.from->robots[edge.robotMovedIndex];
     Point_2& endPoint = edge.to->robots[edge.robotMovedIndex];
     Segment_2 qry(startPoint, endPoint);
@@ -136,7 +152,27 @@ void PathFinder::printStatistics(bool print) {
     cout << "PATH FINDER STATISTICS:\n";
     cout << "max queue size  " << maxQueueSize << endl;
     cout << "number of edges " << numberOfEdges << endl;
-    cout << "number of configuration points " << numberOfCpoints << endl;
+    cout << "number of configurations " << numberOfCpoints << endl;
     cout << "number of edges processed " << processedEdges << endl;
     cout << "number of deprecated edges  " << deprecatedEdges << endl;
+    cout << "number of points cut out " << cuts << endl;
+}
+
+void PathFinder::cutPath() {
+    CPoint CPointIt = this->endCPoint;
+    while(CPointIt != this->startCPoint && CPointIt->last != this->startCPoint)
+    {
+        while(CPointIt->robotChangedIndex == CPointIt->last->robotChangedIndex)
+        {
+            Edge tempEdge({CPointIt->last->last, CPointIt, 0, CPointIt->robotChangedIndex});
+            if(isEdgeLegal(tempEdge))
+            {
+                cuts++;
+                workingSpace.updatePointMap(CPointIt->last->robots[CPointIt->robotChangedIndex], POINT_CUTED);
+                CPointIt->last = CPointIt->last->last;
+            } else
+                break;
+        }
+        CPointIt = CPointIt->last;
+    }
 }

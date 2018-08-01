@@ -11,8 +11,6 @@ using namespace std;
 
 class ConfigurationPoint
 {
-private:
-    static long objectCounter;
 public:
     ConfigurationPoint(vector<Point_2>& robots);
     ConfigurationPoint(CPoint old, int robotChangedIndex, Point_2& robotChangedNewPosition);
@@ -28,7 +26,7 @@ public:
     bool visited = false;
     double heuristic=-1;
     double distance = 0;
-    int robotChangedIndex=-1;
+    int robotChangedIndex = -1;
 };
 
 ostream &operator<<(std::ostream &os, const ConfigurationPoint &cp);
